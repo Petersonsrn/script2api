@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Script2API — Transforme scripts Python em APIs REST em segundos</title>
+  <meta name="description" content="Sem boilerplate, sem deploys complexos. Suba seu script Python e ganhe endpoints instantâneos para executar suas funções em escala." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  
+  <style>
+    /* ── BASE TOKENS ── */
+    :root {
+      --bg: #090d15;
+      --surface: rgba(255,255,255,0.04);
+      --surface-high: rgba(255,255,255,0.08);
+      --border: rgba(255,255,255,0.09);
+      --border-high: rgba(255,255,255,0.18);
+      --accent: #7c5cfc;
+      --accent-hover: #5b4fd8;
+      --accent-2: #00d2ff;
+      --accent-green: #22c55e;
+      --text: #e8eaf0;
+      --text-muted: #8892a4;
+      --text-faint: #4b5568;
+      --font: 'Inter', sans-serif;
+      --radius: 14px;
+      --radius-lg: 20px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+      line-height: 1.6;
+    }
+
+    /* ── BACKGROUND BLOBS ── */
+    .bg-blob {
+      position: fixed; border-radius: 50%; filter: blur(120px); opacity: 0.15; z-index: -1; animation: float 10s infinite alternate;
+    }
+    .blob-1 { width: 500px; height: 500px; background: var(--accent); top: -100px; left: -150px; }
+    .blob-2 { width: 400px; height: 400px; background: var(--accent-2); bottom: -100px; right: -100px; animation-delay: 2s; }
+
+    @keyframes float {
+      from { transform: translate(0, 0); }
+      to { transform: translate(30px, -30px); }
+    }
+
+    /* ── CONTAINER & NAV ── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+    
+    header {
+      padding: 24px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(9, 13, 21, 0.8);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.3s;
+    }
+    
+    .logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 1.3rem; text-decoration: none; color: var(--text); }
+    .logo-accent { color: var(--accent); }
+    .nav-links { display: flex; gap: 24px; align-items: center; }
+    .nav-link { color: var(--text-muted); text-decoration: none; font-size: 0.9rem; font-weight: 500; transition: color 0.2s; }
+    .nav-link:hover { color: var(--text); }
+    
+    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; text-decoration: none; transition: all 0.2s; border: none; cursor: pointer; }
+    .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-hover)); color: #fff; box-shadow: 0 8px 24px rgba(124,92,252,0.3); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(124,92,252,0.5); }
+    .btn-outline { border: 1px solid var(--border-high); background: var(--surface); color: var(--text); }
+    .btn-outline:hover { background: var(--surface-high); border-color: var(--text-faint); }
+
+    /* ── HERO SECTION ── */
+    .hero { text-align: center; padding: 120px 0 80px; }
+    .hero-badge { display: inline-block; padding: 6px 16px; border-radius: 100px; background: rgba(124,92,252,0.1); border: 1px solid rgba(124,92,252,0.2); color: #b19cfd; font-size: 0.85rem; font-weight: 600; margin-bottom: 24px; }
+    .hero h1 { font-size: clamp(2.5rem, 6vw, 4.5rem); font-weight: 800; line-height: 1.1; letter-spacing: -0.03em; margin-bottom: 24px; }
+    .gradient-text { background: linear-gradient(135deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .hero p { font-size: clamp(1.1rem, 2vw, 1.3rem); color: var(--text-muted); max-width: 600px; margin: 0 auto 40px; }
+    .hero-cta { display: flex; gap: 16px; justify-content: center; }
+
+    /* ── WINDOW MOCKUP ── */
+    .mockup-wrapper { margin-top: 64px; perspective: 1000px; }
+    .mockup { background: rgba(14, 20, 36, 0.7); backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,0.5), 0 0 40px rgba(124,92,252,0.2); transform: rotateX(5deg); transition: transform 0.5s ease; }
+    .mockup:hover { transform: rotateX(0deg); }
+    .mockup-header { height: 40px; background: var(--surface-high); display: flex; align-items: center; padding: 0 16px; gap: 8px; border-bottom: 1px solid var(--border); }
+    .mockup-dot { width: 10px; height: 10px; border-radius: 50%; background: #4b5568; }
+    .mockup-dot:nth-child(1) { background: #f43f5e; } .mockup-dot:nth-child(2) { background: #f59e0b; } .mockup-dot:nth-child(3) { background: #22c55e; }
+    .mockup-body { padding: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; text-align: left; }
+    .code-block { background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #a6e3a1; border: 1px solid var(--border); }
+    .code-comment { color: var(--text-faint); }
+    .code-keyword { color: #f38ba8; }
+    .code-string { color: #f9e2af; }
+
+    /* ── BENEFITS SECTION ── */
+    .benefits { padding: 100px 0; }
+    .section-header { text-align: center; margin-bottom: 64px; }
+    .section-header h2 { font-size: 2.5rem; font-weight: 800; margin-bottom: 16px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 32px; }
+    .card { background: var(--surface); border: 1px solid var(--border); padding: 40px 32px; border-radius: var(--radius-lg); transition: transform 0.3s, border-color 0.3s; }
+    .card:hover { transform: translateY(-5px); border-color: var(--border-high); background: var(--surface-high); }
+    .card-icon { width: 56px; height: 56px; border-radius: 16px; background: rgba(124,92,252,0.1); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin-bottom: 24px; color: var(--accent); }
+    .card h3 { font-size: 1.3rem; font-weight: 700; margin-bottom: 12px; }
+    .card p { color: var(--text-muted); font-size: 0.95rem; }
+
+    /* ── PRICING SECTION ── */
+    .pricing { padding: 80px 0 120px; }
+    .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 32px; max-width: 800px; margin: 0 auto; }
+    .price-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 48px 32px; display: flex; flex-direction: column; position: relative; }
+    .price-card.pro { border-color: var(--accent); background: rgba(14,20,36,0.8); box-shadow: 0 16px 48px rgba(124,92,252,0.15); }
+    .popular-tag { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--accent); color: white; padding: 4px 16px; border-radius: 100px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+    .price-name { font-size: 1.2rem; font-weight: 600; color: var(--text-muted); margin-bottom: 16px; }
+    .price-card.pro .price-name { color: var(--accent); }
+    .price-value { font-size: 3.5rem; font-weight: 800; line-height: 1; margin-bottom: 8px; }
+    .price-value span { font-size: 1rem; font-weight: 500; color: var(--text-muted); }
+    .price-desc { margin-bottom: 32px; color: var(--text-muted); }
+    
+    .feature-list { list-style: none; margin-bottom: 40px; flex: 1; }
+    .feature-list li { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; font-size: 0.95rem; color: var(--text); }
+    .feature-list li .check { color: var(--accent-green); font-weight: bold; }
+    .feature-list li .cross { color: var(--text-faint); font-weight: bold; }
+    .feature-list li.disabled { color: var(--text-muted); }
+
+    /* ── FOOTER ── */
+    footer { border-top: 1px solid var(--border); padding: 60px 0; text-align: center; color: var(--text-muted); }
+    footer .logo { justify-content: center; margin-bottom: 24px; }
+    
+    @media (max-width: 768px) {
+      .mockup-body { grid-template-columns: 1fr; }
+      .nav-links { display: none; }
+      .hero-cta { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- BACKGROUND BLOBS -->
+  <div class="bg-blob blob-1"></div>
+  <div class="bg-blob blob-2"></div>
+
+  <!-- HEADER -->
+  <header>
+    <div class="container" style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+      <a href="#" class="logo">
+        <span class="logo-icon">⚡</span>
+        <span>Script<span class="logo-accent">2API</span></span>
+      </a>
+      <nav class="nav-links">
+        <a href="#features" class="nav-link">Benefícios</a>
+        <a href="#pricing" class="nav-link">Preços</a>
+        <a href="http://localhost:8000/docs" class="nav-link">Documentação</a>
+        <a href="index.html" class="btn btn-primary" style="padding: 8px 20px;">Entrar</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero container">
+    <div class="hero-badge">✨ Feito para Desenvolvedores e Cientistas de Dados</div>
+    <h1>Transforme <span class="gradient-text">Python</span> em<br/> uma API REST.</h1>
+    <p>Sem configurações de servidor, sem quebrar a cabeça com <code>FastAPI</code> ou <code>Flask</code>. Apenas faça upload do seu script <code>.py</code> e nós geraremos endpoints documentados e prontos para escalar.</p>
+    
+    <div class="hero-cta">
+      <a href="index.html" class="btn btn-primary">Começar gratuitamente</a>
+      <a href="#features" class="btn btn-outline">Ver como funciona</a>
+    </div>
+
+    <!-- MOCKUP VISUAL -->
+    <div class="mockup-wrapper">
+      <div class="mockup">
+        <div class="mockup-header">
+          <div class="mockup-dot"></div>
+          <div class="mockup-dot"></div>
+          <div class="mockup-dot"></div>
+        </div>
+        <div class="mockup-body">
+          <div class="code-block">
+            <span class="code-comment"># input.py enviado por você</span><br/><br/>
+            <span class="code-keyword">def</span> processar_vendas(faturamento, ano):<br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;taxa = <span class="code-string">0.15</span><br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">return</span> {<br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-string">"lucro"</span>: faturamento * (<span class="code-string">1</span> - taxa),<br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-string">"ano"</span>: ano<br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+          </div>
+          <div class="code-block">
+            <span class="code-comment"># Instantaneamente online:</span><br/><br/>
+            $ curl -X POST \<br/>
+            &nbsp;&nbsp;https://api.script2api.com/run/processar_vendas \<br/>
+            &nbsp;&nbsp;-H <span class="code-string">'Authorization: Bearer seu_token'</span> \<br/>
+            &nbsp;&nbsp;-d <span class="code-string">'{"faturamento": 50000, "ano": 2024}'</span><br/><br/>
+            
+            <span class="code-comment"># Resposta JSON:</span><br/>
+            <span style="color:#89b4fa">{</span><br/>
+            &nbsp;&nbsp;<span class="code-string">"lucro"</span>: <span style="color:#fab387">42500.0</span>,<br/>
+            &nbsp;&nbsp;<span class="code-string">"ano"</span>: <span style="color:#fab387">2024</span><br/>
+            <span style="color:#89b4fa">}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="features" class="benefits container">
+    <div class="section-header">
+      <h2>Pule o Boilerplate</h2>
+      <p style="color:var(--text-muted); max-width: 500px; margin: 0 auto;">Foque na regra de negócio da sua empresa enquanto gerenciamos a infraestrutura, segurança e execução.</p>
+    </div>
+    
+    <div class="grid-3">
+      <div class="card">
+        <div class="card-icon">⚡</div>
+        <h3>Conversão Zero-Config</h3>
+        <p>Não construa rotas REST manualmente. O sistema lê o AST do seu código e gera instantaneamente a documentação Swagger e endpoints isolados de todas as funções válidas.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🛡️</div>
+        <h3>Execução Sandbox</h3>
+        <p>Desenvolvedor júnior subiu código ruim? O ambiente roda num sandbox estrito que bloqueia acessos a sistema (`os`, `subprocess`) e corta infinit-loops com timeouts forçados.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📊</div>
+        <h3>Métricas e Histórico</h3>
+        <p>Veja rapidamente quais scripts estão performando melhor, quanto tempo levam para executar e verifique debuggers no painel histórico completo embutido no Dashboard.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICING -->
+  <section id="pricing" class="pricing container">
+    <div class="section-header">
+      <h2>Planos Simples e Transparentes</h2>
+      <p style="color:var(--text-muted); max-width: 500px; margin: 0 auto;">Suba de divisão com pagamentos otimizados pela Stripe.</p>
+    </div>
+
+    <div class="pricing-grid">
+      <!-- Free Plan -->
+      <div class="price-card">
+        <div class="price-name">Plano Starter</div>
+        <div class="price-value">Grátis</div>
+        <p class="price-desc">Ideal para testes rápidos e validação de MVPs em produção.</p>
+        
+        <ul class="feature-list">
+          <li><span class="check">✓</span> 5 execuções / mês</li>
+          <li><span class="check">✓</span> Upload de scripts até 50KB</li>
+          <li><span class="check">✓</span> Acesso ao Sandbox restrito</li>
+          <li class="disabled"><span class="cross">✕</span> Sem histórico estendido</li>
+          <li class="disabled"><span class="cross">✕</span> Sem dependências avançadas</li>
+        </ul>
+        
+        <a href="index.html" class="btn btn-outline" style="width: 100%;">Começar de Graça</a>
+      </div>
+
+      <!-- Pro Plan -->
+      <div class="price-card pro">
+        <div class="popular-tag">Recomendado</div>
+        <div class="price-name">Plano Pro</div>
+        <div class="price-value">$9 <span>/ mês</span></div>
+        <p class="price-desc">Escalonamento ilimitado para levar seu script além.</p>
+        
+        <ul class="feature-list">
+          <li><span class="check">✓</span> <strong>Execuções Ilimitadas</strong></li>
+          <li><span class="check">✓</span> Upload de scripts de até 5MB</li>
+          <li><span class="check">✓</span> Histórico perpétuo de logs e erros</li>
+          <li><span class="check">✓</span> Suporte a bibliotecas pesadas (pandas, numpy)*</li>
+          <li><span class="check">✓</span> Timeout massivo de 30s</li>
+        </ul>
+        
+        <a href="index.html" class="btn btn-primary" style="width: 100%;">Assinar o Plano Pro</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="container">
+    <a href="#" class="logo">
+      <span class="logo-icon">⚡</span>
+      <span>Script<span class="logo-accent">2API</span></span>
+    </a>
+    <p>Construído com FastAPI & Vanilla JS. Infraestrutura SaaS prontas para escalar.</p>
+    <div style="margin-top: 16px; font-size: 0.85rem;">
+      <a href="#">Privacidade</a> &middot; <a href="#">Termos de Uso</a>
+    </div>
+  </footer>
+
+</body>
+</html>

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Script2API — Turn Python into REST APIs</title>
+  <meta name="description" content="Faça upload de qualquer script Python e obtenha uma API REST documentada em segundos." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ── BACKGROUND BLOBS ── -->
+  <div class="bg-blob blob-1"></div>
+  <div class="bg-blob blob-2"></div>
+  <div class="bg-blob blob-3"></div>
+
+  <!-- ══════════════════════════════
+       AUTH MODAL
+  ══════════════════════════════ -->
+  <div class="modal-overlay hidden" id="auth-modal-overlay" onclick="closeAuthModal(event)">
+    <div class="modal-card" id="auth-modal">
+      <button class="modal-close" onclick="hideAuthModal()">✕</button>
+
+      <div class="modal-logo">
+        <span class="logo-icon">⚡</span>
+        <span class="logo-text">Script<span class="logo-accent">2API</span></span>
+      </div>
+
+      <!-- Modal Tabs -->
+      <div class="modal-tabs">
+        <button class="modal-tab active" id="mtab-login" onclick="switchAuthTab('login')">Entrar</button>
+        <button class="modal-tab" id="mtab-register" onclick="switchAuthTab('register')">Cadastrar</button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="form-login" class="auth-form" onsubmit="submitLogin(event)">
+        <div class="field-row">
+          <label for="login-email" class="field-label">E-mail</label>
+          <input type="email" id="login-email" class="field-input" placeholder="seu@email.com" required />
+        </div>
+        <div class="field-row">
+          <label for="login-password" class="field-label">Senha</label>
+          <input type="password" id="login-password" class="field-input" placeholder="••••••" required />
+        </div>
+        <div class="auth-error hidden" id="login-error"></div>
+        <button type="submit" class="btn-primary" id="btn-login-submit">
+          <span class="btn-icon">→</span> Entrar
+        </button>
+        <p class="auth-switch">Não tem conta?
+          <button type="button" class="link-btn" onclick="switchAuthTab('register')">Cadastre-se</button>
+        </p>
+      </form>
+
+      <!-- Register Form -->
+      <form id="form-register" class="auth-form hidden" onsubmit="submitRegister(event)">
+        <div class="field-row">
+          <label for="reg-username" class="field-label">Username</label>
+          <input type="text" id="reg-username" class="field-input" placeholder="joao_silva" required minlength="3" maxlength="30" />
+        </div>
+        <div class="field-row">
+          <label for="reg-email" class="field-label">E-mail</label>
+          <input type="email" id="reg-email" class="field-input" placeholder="seu@email.com" required />
+        </div>
+        <div class="field-row">
+          <label for="reg-password" class="field-label">Senha <span class="optional">(min. 6 caracteres)</span></label>
+          <input type="password" id="reg-password" class="field-input" placeholder="••••••" required minlength="6" />
+        </div>
+        <div class="auth-error hidden" id="register-error"></div>
+        <button type="submit" class="btn-primary" id="btn-register-submit">
+          <span class="btn-icon">✓</span> Criar conta grátis
+        </button>
+        <p class="auth-switch">Já tem conta?
+          <button type="button" class="link-btn" onclick="switchAuthTab('login')">Entrar</button>
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── HEADER ── -->
+  <header class="header">
+    <div class="logo">
+      <span class="logo-icon">⚡</span>
+      <span class="logo-text">Script<span class="logo-accent">2API</span></span>
+    </div>
+    <nav class="header-nav">
+      <a href="http://localhost:8000/docs" target="_blank" id="nav-docs" class="nav-link">Swagger ↗</a>
+
+      <!-- Guest state -->
+      <div id="header-guest">
+        <button class="btn-header-auth" onclick="showAuthModal('login')">Entrar</button>
+        <button class="btn-header-auth btn-register-header" onclick="showAuthModal('register')">Cadastrar</button>
+      </div>
+
+      <!-- Logged-in state -->
+      <div id="header-user" class="hidden">
+        <div class="user-pill" onclick="toggleUserMenu()">
+          <div class="user-avatar" id="user-avatar">J</div>
+          <span class="user-name" id="user-name-label">—</span>
+          <span class="plan-badge" id="plan-badge">free</span>
+          <span class="chevron">▾</span>
+        </div>
+        <div class="user-menu hidden" id="user-menu">
+          <div class="user-menu-info" id="user-menu-info">
+            <small>Uso este mês</small>
+            <div class="usage-mini-bar">
+              <div class="usage-mini-fill" id="menu-usage-fill"></div>
+            </div>
+            <small id="menu-usage-text">0/5</small>
+          </div>
+          <hr class="menu-divider" />
+          <button class="menu-item" onclick="openHistory()">📋 Histórico</button>
+          <button class="menu-item" id="btn-upgrade-pro" onclick="checkoutPro()" style="color:var(--accent);font-weight:bold;">🌟 Upgrade para Pro</button>
+          <button class="menu-item hidden" id="btn-manage-sub" onclick="manageSubscription()">💳 Gerenciar Assinatura</button>
+          <hr class="menu-divider" />
+          <button class="menu-item danger" onclick="logout()">↩ Sair</button>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <!-- ── HERO ── -->
+  <section class="hero">
+    <div class="hero-tag">🚀 Sem boilerplate. Sem configuração.</div>
+    <h1 class="hero-title">Transforme <span class="gradient-text">Python</span><br/>em uma REST API</h1>
+    <p class="hero-sub">Faça upload do seu <code>.py</code>, converta as funções e execute-as via API.</p>
+
+    <!-- Usage bar (shown when logged in) -->
+    <div class="usage-hero hidden" id="usage-hero">
+      <div class="usage-hero-label">
+        <span id="usage-hero-text">0 / 5 conversões este mês</span>
+        <span class="usage-hero-reset" id="usage-hero-reset"></span>
+      </div>
+      <div class="usage-hero-track">
+        <div class="usage-hero-fill" id="usage-hero-fill"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── MAIN CARD ── -->
+  <main class="main-card" id="app">
+
+    <!-- ── TABS ── -->
+    <div class="tabs" role="tablist">
+      <button class="tab active" id="tab-convert" role="tab" onclick="switchTab('convert')">📄 Converter</button>
+      <button class="tab" id="tab-run" role="tab" onclick="switchTab('run')">▶ Executar Função</button>
+    </div>
+
+    <!-- PANEL: CONVERTER -->
+    <div id="panel-convert" class="panel active" role="tabpanel">
+      <div class="upload-zone" id="upload-zone"
+           ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event,'convert')">
+        <input type="file" id="file-convert" accept=".py" class="file-input" onchange="onFileSelect(event,'convert')" />
+        <div class="upload-icon">🐍</div>
+        <p class="upload-title">Arraste seu <code>.py</code> aqui</p>
+        <p class="upload-sub">ou clique para selecionar</p>
+        <button class="btn-ghost" onclick="document.getElementById('file-convert').click()">Escolher arquivo</button>
+      </div>
+      <div class="file-badge hidden" id="file-badge-convert">
+        <span class="file-badge-icon">📄</span>
+        <span class="file-badge-name" id="file-badge-name-convert">—</span>
+        <button class="file-badge-remove" onclick="clearFile('convert')">✕</button>
+      </div>
+      <button class="btn-primary" id="btn-convert" onclick="runConvert()" disabled>
+        <span class="btn-icon">⚡</span> Converter Script
+      </button>
+    </div>
+
+    <!-- PANEL: RUN -->
+    <div id="panel-run" class="panel" role="tabpanel">
+      <div class="upload-zone" id="upload-zone-run"
+           ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event,'run')">
+        <input type="file" id="file-run" accept=".py" class="file-input" onchange="onFileSelect(event,'run')" />
+        <div class="upload-icon">🐍</div>
+        <p class="upload-title">Arraste seu <code>.py</code> aqui</p>
+        <p class="upload-sub">ou clique para selecionar</p>
+        <button class="btn-ghost" onclick="document.getElementById('file-run').click()">Escolher arquivo</button>
+      </div>
+      <div class="file-badge hidden" id="file-badge-run">
+        <span class="file-badge-icon">📄</span>
+        <span class="file-badge-name" id="file-badge-name-run">—</span>
+        <button class="file-badge-remove" onclick="clearFile('run')">✕</button>
+      </div>
+      <div class="field-row">
+        <label for="func-name" class="field-label">Nome da Função <span class="required">*</span></label>
+        <input type="text" id="func-name" class="field-input" placeholder="ex: soma, calcular_imc" />
+      </div>
+      <div class="field-row">
+        <label for="func-args" class="field-label">
+          Argumentos <span class="optional">(JSON)</span>
+          <span class="field-hint">ex: {"a": 3, "b": 7}</span>
+        </label>
+        <textarea id="func-args" class="field-textarea" rows="3" placeholder='{"a": 1, "b": 2}'>{}</textarea>
+      </div>
+      <div class="fields-inline">
+        <div class="field-row flex-1">
+          <label for="timeout" class="field-label">Timeout (s)</label>
+          <input type="number" id="timeout" class="field-input" value="5" min="1" max="10" step="0.5" />
+        </div>
+      </div>
+      <button class="btn-primary btn-green" id="btn-run" onclick="runExecute()" disabled>
+        <span class="btn-icon">▶</span> Executar Função
+      </button>
+    </div>
+
+    <!-- SEPARATOR -->
+    <div class="result-separator hidden" id="result-separator"><span>Resultado</span></div>
+
+    <!-- RESULT BLOCK -->
+    <div class="result-block hidden" id="result-block">
+      <div class="result-status-bar" id="result-status-bar">
+        <div class="result-status-dot" id="result-status-dot"></div>
+        <span class="result-status-text" id="result-status-text">—</span>
+        <span class="result-exec-time" id="result-exec-time"></span>
+        <button class="btn-copy" id="btn-copy" onclick="copyResult()">📋 Copiar</button>
+      </div>
+      <div id="endpoints-section" class="hidden">
+        <h3 class="section-heading">Endpoints gerados</h3>
+        <div id="endpoints-list" class="endpoints-list"></div>
+      </div>
+      <div id="code-section" class="hidden">
+        <div class="code-header">
+          <h3 class="section-heading" style="margin:0">Código gerado</h3>
+          <button class="btn-ghost-sm" onclick="copyCode()">📋 Copiar código</button>
+        </div>
+        <pre class="code-block" id="generated-code"></pre>
+      </div>
+      <div id="exec-section" class="hidden">
+        <h3 class="section-heading">Resultado da execução</h3>
+        <pre class="code-block result-value" id="exec-result"></pre>
+      </div>
+      <div id="error-section" class="hidden">
+        <div class="error-box" id="error-box"></div>
+      </div>
+      <!-- Usage inline result -->
+      <div class="usage-result hidden" id="usage-result">
+        <div class="usage-result-inner">
+          <span class="usage-result-label" id="usage-result-label">0/5 usos</span>
+          <div class="usage-bar-track">
+            <div class="usage-bar-fill" id="usage-bar-fill"></div>
+          </div>
+          <span class="usage-result-plan" id="usage-result-plan">free</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOADING OVERLAY -->
+    <div class="loading-overlay hidden" id="loading-overlay">
+      <div class="spinner"></div>
+      <p class="loading-text" id="loading-text">Processando…</p>
+    </div>
+
+  </main>
+
+  <!-- HISTORY PANEL (slide-in) -->
+  <div class="history-overlay hidden" id="history-overlay" onclick="closeHistory(event)">
+    <div class="history-panel" id="history-panel">
+      <div class="history-header">
+        <h2 class="history-title">📋 Histórico de Conversões</h2>
+        <button class="modal-close" onclick="closeHistoryPanel()">✕</button>
+      </div>
+      <div class="history-list" id="history-list">
+        <div class="history-loading">Carregando…</div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    Script2API &copy; 2025 — <a href="http://localhost:8000/docs" target="_blank">API Docs</a> · Powered by FastAPI
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
