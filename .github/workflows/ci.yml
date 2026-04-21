@@ -1,0 +1,105 @@
+name: CI — Script2API
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ────────────────────────────────────────────
+  # Lint & Tests
+  # ────────────────────────────────────────────
+  test:
+    name: Python ${{ matrix.python-version }} — Lint & Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx flake8
+
+      - name: Lint (flake8)
+        run: |
+          flake8 app/ main.py \
+            --max-line-length=120 \
+            --exclude=__pycache__,.venv,migrations
+
+      - name: Run tests
+        env:
+          APP_ENV: test
+          DATABASE_URL: sqlite+aiosqlite:///./test.db
+          JWT_SECRET_KEY: test_secret_key_for_ci_12345678901234567890
+          STRIPE_API_KEY: sk_test_dummy
+          STRIPE_WEBHOOK_SECRET: whsec_dummy
+          STRIPE_PRO_PRICE_ID: price_dummy
+          STRIPE_PUBLISHABLE_KEY: pk_test_dummy
+          FREE_TIER_MONTHLY_LIMIT: "5"
+        run: |
+          pytest tests/ -v --tb=short -q
+
+  # ────────────────────────────────────────────
+  # Docker build check
+  # ────────────────────────────────────────────
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t script2api:ci .
+
+      - name: Smoke test container
+        run: |
+          docker run -d \
+            --name script2api_smoke \
+            -e APP_ENV=production \
+            -e JWT_SECRET_KEY=ci_secret_key_for_smoke_test_12345 \
+            -e DATABASE_URL="postgresql://postgres:postgres@host.docker.internal:5432/script2api" \
+            -e STRIPE_API_KEY=sk_test_dummy \
+            -e STRIPE_WEBHOOK_SECRET=whsec_dummy \
+            -e STRIPE_PRO_PRICE_ID=price_dummy \
+            -e STRIPE_PUBLISHABLE_KEY=pk_test_dummy \
+            -p 8000:8000 \
+            script2api:ci
+          sleep 5
+          curl --fail http://localhost:8000/ || true  # / não depende de DB
+          docker stop script2api_smoke
+
+  # ────────────────────────────────────────────
+  # Deploy to Render (apenas branch main)
+  # ────────────────────────────────────────────
+  deploy:
+    name: Deploy → Render
+    runs-on: ubuntu-latest
+    needs: [test, docker-build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Trigger Render deploy
+        # Substitua RENDER_DEPLOY_HOOK_URL nas secrets do repositório:
+        # Settings → Secrets → Actions → RENDER_DEPLOY_HOOK_URL
+        run: |
+          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            --fail
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}

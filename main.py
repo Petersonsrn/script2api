@@ -1,41 +1,56 @@
 """
-Script2API — Turn any Python script into a REST API instantly.
+Script2API — entrypoint da aplicação FastAPI.
+
+Responsabilidades:
+  - Criação e configuração do app FastAPI
+  - CORS middleware com origens da config
+  - Startup/shutdown do pool asyncpg
+  - Registro de todos os routers
+  - Handler global de erros
+  - Endpoints raiz e versão
 """
+from __future__ import annotations
+
+import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.db import init_db, init_pool, close_pool
-from app.routers import convert, health
-from app.routers import auth
+from app.routers import auth, billing, convert, health
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.DEBUG if not settings.is_production else logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
+)
+logger = logging.getLogger("script2api")
 
 
-# ------------------------------------------------------------------ #
-#  Lifespan (startup / shutdown)                                       #
-# ------------------------------------------------------------------ #
+# ── Lifespan (startup / shutdown) ─────────────────────────────────────────────
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
+async def lifespan(app: FastAPI):  # noqa: ARG001
+    logger.info("🚀 Script2API iniciando (env=%s)…", settings.app_env)
     await init_pool()
     await init_db()
+    logger.info("✅ Pool conectado e tabelas verificadas.")
     yield
-    # Shutdown
     await close_pool()
+    logger.info("🛑 Pool encerrado. Shutdown completo.")
 
 
-# ------------------------------------------------------------------ #
-#  Application factory                                                 #
-# ------------------------------------------------------------------ #
+# ── Application factory ────────────────────────────────────────────────────────
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Script2API",
         description=(
-            "Paste or upload any Python script and instantly get a fully "
-            "documented REST API — no boilerplate needed."
+            "Transforme qualquer script Python em uma API REST documentada — "
+            "sem boilerplate, sem configuração."
         ),
-        version="1.1.0",
+        version="1.2.0",
         contact={"name": "Script2API", "url": "https://github.com/your-username/script2api"},
         license_info={"name": "MIT"},
         docs_url="/docs",
@@ -43,7 +58,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # ---- CORS ---- #
+    # ── CORS ──────────────────────────────────────────────────────────────────
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.origins_list,
@@ -52,13 +67,35 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # ---- Routers ---- #
+    # ── Routers ───────────────────────────────────────────────────────────────
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(convert.router)
-    
-    from app.routers import billing
     app.include_router(billing.router)
+
+    # ── Exception Handlers ────────────────────────────────────────────────────
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "detail": exc.detail,
+                "path": str(request.url.path),
+                "status_code": exc.status_code,
+            },
+        )
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception):
+        logger.exception("Erro não tratado em %s: %s", request.url.path, exc)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": "Erro interno do servidor. Tente novamente mais tarde.",
+                "path": str(request.url.path),
+                "status_code": 500,
+            },
+        )
 
     return app
 
@@ -66,27 +103,32 @@ def create_app() -> FastAPI:
 app = create_app()
 
 
-# ------------------------------------------------------------------ #
-#  Root                                                                #
-# ------------------------------------------------------------------ #
-@app.get("/", tags=["root"])
+# ── Root ──────────────────────────────────────────────────────────────────────
+@app.get("/", tags=["meta"], summary="Informações do serviço")
 async def root():
     return {
         "service": "Script2API",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "docs": "/docs",
+        "health": "/health",
         "status": "online",
+        "env": settings.app_env,
     }
 
 
-# ------------------------------------------------------------------ #
-#  Dev entrypoint                                                      #
-# ------------------------------------------------------------------ #
+@app.get("/version", tags=["meta"], summary="Versão da API")
+async def version():
+    return {"version": "1.2.0", "env": settings.app_env}
+
+
+# ── Dev entrypoint ────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "main:app",
         host=settings.app_host,
         port=settings.app_port,
-        reload=settings.app_env == "development",
+        reload=not settings.is_production,
+        log_level="info",
     )

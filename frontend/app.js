@@ -3,7 +3,27 @@
    Vanilla JS: upload, convert, execute, render results + Auth
    ============================================================ */
 
-const API_BASE = "https://script2api.onrender.com";
+/**
+ * API_BASE: lê da meta tag <meta name="api-url" content="...">
+ * no index.html, ou do localStorage (dev override), ou fallback produção.
+ *
+ * Para apontar para um backend diferente localmente:
+ *   localStorage.setItem("s2api_base", "http://localhost:8000")
+ *   location.reload()
+ */
+const API_BASE = (() => {
+  // 1. Override de desenvolvimento via localStorage
+  const override = localStorage.getItem("s2api_base");
+  if (override) return override.replace(/\/$/, "");
+  // 2. Meta tag no HTML (configurado por ambiente no build)
+  const meta = document.querySelector('meta[name="api-url"]');
+  if (meta?.content) return meta.content.replace(/\/$/, "");
+  // 3. Fallback produção
+  return "https://script2api.onrender.com";
+})();
+
+// Expõe para handlers onclick no HTML
+window._apiBase = API_BASE;
 
 // ── State ─────────────────────────────────────────────────
 const state = {

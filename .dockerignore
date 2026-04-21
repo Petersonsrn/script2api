@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+
+# Env vars
+.env
+.env.local
+.env.*.local
+
+# DB local
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.egg-info/
+
+# Git
+.git/
+.gitignore
+
+# Testes
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Docs
+docs/
+README.md
+
+# CI
+.github/
+
+# Smoke / scripts locais
+smoke_test.py
+test_*.py
+scripts/

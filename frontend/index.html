@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Script2API — Turn Python into REST APIs</title>
   <meta name="description" content="Faça upload de qualquer script Python e obtenha uma API REST documentada em segundos." />
+  <!-- URL do backend — altere aqui para apontar para outro ambiente -->
+  <meta name="api-url" content="https://script2api.onrender.com" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -86,7 +88,7 @@
       <span class="logo-text">Script<span class="logo-accent">2API</span></span>
     </div>
     <nav class="header-nav">
-      <a href="http://localhost:8000/docs" target="_blank" id="nav-docs" class="nav-link">Swagger ↗</a>
+      <a href="#" id="nav-docs" class="nav-link" onclick="window.open(window._apiBase+'/docs','_blank')">Swagger ↗</a>
 
       <!-- Guest state -->
       <div id="header-guest">
@@ -268,7 +270,7 @@
   </div>
 
   <footer class="footer">
-    Script2API &copy; 2025 — <a href="http://localhost:8000/docs" target="_blank">API Docs</a> · Powered by FastAPI
+    Script2API &copy; 2025 — <a href="#" onclick="window.open(window._apiBase+'/docs','_blank')" id="footer-docs">API Docs</a> · Powered by FastAPI
   </footer>
 
   <script src="app.js"></script>
