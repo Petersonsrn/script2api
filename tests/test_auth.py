@@ -73,6 +73,39 @@ async def test_me_with_valid_token(client):
 
 
 @pytest.mark.asyncio
+async def test_history_pagination(client):
+    reg = await client.post("/auth/register", json={
+        "email": "hist@example.com", "username": "histuser", "password": "senha123"
+    })
+    token = reg.json()["access_token"]
+    res = await client.get("/auth/history?limit=5&offset=0", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 200
+    body = res.json()
+    assert "items" in body
+    assert body["limit"] == 5
+    assert body["offset"] == 0
+
+
+@pytest.mark.asyncio
+async def test_delete_me_requires_auth(client):
+    res = await client.delete("/auth/me")
+    assert res.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_delete_me_success(client):
+    reg = await client.post("/auth/register", json={
+        "email": "del@example.com", "username": "deluser", "password": "senha123"
+    })
+    token = reg.json()["access_token"]
+    res = await client.delete("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 204
+    # Após deleção, /me deve retornar 401 (token ainda válido mas usuário sumiu)
+    res2 = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert res2.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_health_endpoint(client):
     res = await client.get("/health")
     # Pode retornar 200 ou 503 dependendo do DB mock

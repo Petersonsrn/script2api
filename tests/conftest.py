@@ -72,7 +72,7 @@ def patch_db(monkeypatch):
             created_at="2024-01-01T00:00:00+00:00",
         )
 
-    async def _get_history(user_id, limit=20):
+    async def _get_history(user_id, limit=20, offset=0):
         return []
 
     async def _set_plan(user_id, plan):
@@ -87,6 +87,14 @@ def patch_db(monkeypatch):
 
     async def _upsert_subscription(*args, **kwargs):
         pass
+
+    async def _delete_user(user_id):
+        removed = False
+        for email, u in list(_fake_users.items()):
+            if u.id == user_id:
+                del _fake_users[email]
+                removed = True
+        return removed
 
     async def _is_event_processed(event_id):
         return False
@@ -119,6 +127,7 @@ def patch_db(monkeypatch):
     monkeypatch.setattr(db_module, "is_event_processed", _is_event_processed)
     monkeypatch.setattr(db_module, "save_webhook_event", _save_webhook_event)
     monkeypatch.setattr(db_module, "mark_event_processed", _mark_event_processed)
+    monkeypatch.setattr(db_module, "delete_user", _delete_user)
     monkeypatch.setattr(db_module, "init_pool", _init_pool)
     monkeypatch.setattr(db_module, "init_db", _init_db)
     monkeypatch.setattr(db_module, "close_pool", _close_pool)

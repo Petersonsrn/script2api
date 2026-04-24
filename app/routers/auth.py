@@ -142,11 +142,13 @@ async def me(current: dict = Depends(get_current_user)):
     "/history",
     summary="Historico de uploads do usuario autenticado",
 )
-async def history(limit: int = 20, current: dict = Depends(get_current_user)):
-    """Retorna as ultimas N conversoes do usuario (padrao 20)."""
-    records = await get_user_history(current["sub"], limit=min(limit, 50))
+async def history(limit: int = 20, offset: int = 0, current: dict = Depends(get_current_user)):
+    """Retorna as ultimas N conversoes do usuario com paginacao."""
+    records = await get_user_history(current["sub"], limit=min(limit, 50), offset=max(offset, 0))
     return {
         "total": len(records),
+        "limit": limit,
+        "offset": offset,
         "items": [
             {
                 "id": r.id,
@@ -172,3 +174,23 @@ async def upgrade(req: UpgradeRequest, current: dict = Depends(get_current_user)
         raise HTTPException(status_code=422, detail="Plano invalido. Use 'free' ou 'pro'.")
     await set_user_plan(current["sub"], req.plan)
     return {"message": f"Plano alterado para '{req.plan}' com sucesso."}
+
+
+@router.delete(
+    "/me",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Excluir conta e todos os dados",
+)
+async def delete_me(current: dict = Depends(get_current_user)):
+    """Exclui o usuario autenticado e todo o historico (LGPD/GDPR).
+
+    Uploads, assinaturas e dados de billing sao removidos via CASCADE.
+    """
+    user_id = current["sub"]
+    user = await get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario nao encontrado.")
+
+    from app.db import delete_user
+    await delete_user(user_id)
+    return None

@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
+from app.core.version import __version__
 from app.db import init_db, init_pool, close_pool
 from app.routers import auth, billing, convert, health
 
@@ -50,7 +51,7 @@ def create_app() -> FastAPI:
             "Transforme qualquer script Python em uma API REST documentada — "
             "sem boilerplate, sem configuração."
         ),
-        version="1.2.0",
+        version=__version__,
         contact={"name": "Script2API", "url": "https://github.com/your-username/script2api"},
         license_info={"name": "MIT"},
         docs_url="/docs",
@@ -108,7 +109,7 @@ app = create_app()
 async def root():
     return {
         "service": "Script2API",
-        "version": "1.2.0",
+        "version": __version__,
         "docs": "/docs",
         "health": "/health",
         "status": "online",
@@ -118,7 +119,7 @@ async def root():
 
 @app.get("/version", tags=["meta"], summary="Versão da API")
 async def version():
-    return {"version": "1.2.0", "env": settings.app_env}
+    return {"version": __version__, "env": settings.app_env}
 
 
 # ── Dev entrypoint ────────────────────────────────────────────────────────────

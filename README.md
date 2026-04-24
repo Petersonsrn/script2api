@@ -125,7 +125,8 @@ Visit → **http://localhost:8000/docs**
 | `POST` | `/auth/register` | Create account |
 | `POST` | `/auth/login` | Login (returns JWT) |
 | `GET` | `/auth/me` | Current user + usage |
-| `GET` | `/auth/history` | Upload/conversion history |
+| `GET` | `/auth/history` | Upload/conversion history (paginated) |
+| `DELETE` | `/auth/me` | Delete account and all data (LGPD/GDPR) |
 | `POST` | `/billing/create-checkout-session` | Start Pro subscription |
 | `POST` | `/billing/create-portal-session` | Manage subscription |
 | `POST` | `/billing/webhook` | Stripe events (idempotent) |

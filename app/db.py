@@ -235,6 +235,13 @@ async def get_user_by_stripe_id(customer_id: str) -> User | None:
     return _row_to_user(row) if row else None
 
 
+async def delete_user(user_id: str) -> None:
+    """Remove o usuario e todos os registros associados (CASCADE)."""
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM users WHERE id = $1", user_id)
+
+
 async def set_user_plan(user_id: str, plan: str) -> None:
     pool = get_pool()
     async with pool.acquire() as conn:
@@ -292,13 +299,13 @@ async def count_uploads_this_month(user_id: str) -> int:
     return row[0] if row else 0
 
 
-async def get_user_history(user_id: str, limit: int = 20) -> list[Upload]:
+async def get_user_history(user_id: str, limit: int = 20, offset: int = 0) -> list[Upload]:
     pool = get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             "SELECT id, user_id, filename, script_name, endpoints_n, status, error_msg, created_at "
-            "FROM uploads WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2",
-            user_id, limit,
+            "FROM uploads WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+            user_id, limit, offset,
         )
     return [
         Upload(
