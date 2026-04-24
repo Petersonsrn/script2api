@@ -16,6 +16,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -68,6 +69,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # ── Gzip compression ────────────────────────────────────────────────────
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
 
     # ── Static files (frontend) ─────────────────────────────────────────────
     app.mount("/static", StaticFiles(directory="frontend"), name="static")

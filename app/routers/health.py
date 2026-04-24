@@ -3,11 +3,11 @@ app/routers/health.py — Endpoint de verificação de saúde e status.
 """
 from __future__ import annotations
 
-import asyncpg
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
+from app.core.version import __version__
 from app.db import get_pool
 
 router = APIRouter(tags=["health"])
@@ -33,7 +33,7 @@ async def health():
         status_code=status_code,
         content={
             "status": "ok" if db_status == "ok" else "degraded",
-            "version": "1.2.0",
+            "version": __version__,
             "env": settings.app_env,
             "database": db_status,
             "db_error": db_error,
