@@ -146,8 +146,8 @@
       <nav class="nav-links">
         <a href="#features" class="nav-link">Benefícios</a>
         <a href="#pricing" class="nav-link">Preços</a>
-        <a href="http://localhost:8000/docs" class="nav-link">Documentação</a>
-        <a href="index.html" class="btn btn-primary" style="padding: 8px 24px;">Acessar Dashboard</a>
+        <a href="/docs" class="nav-link">Documentação</a>
+        <a href="/app" class="btn btn-primary" id="nav-dash-btn" style="padding: 8px 24px;">Acessar Dashboard</a>
       </nav>
     </div>
   </header>
@@ -159,7 +159,7 @@
     <p>Sem configurações de servidor, sem quebrar a cabeça com <code>FastAPI</code> ou <code>Flask</code>. Apenas faça upload do seu script <code>.py</code> e nós geraremos endpoints documentados e prontos para escalar.</p>
     
     <div class="hero-cta">
-      <a href="index.html?action=register" class="btn btn-primary">Começar Gratuitamente</a>
+      <a href="/app?action=register" class="btn btn-primary" id="hero-cta-btn">Começar Gratuitamente</a>
       <a href="#features" class="btn btn-outline">Como funciona?</a>
     </div>
 
@@ -263,7 +263,7 @@
           <li><span class="check">✓</span> Suporte a bibliotecas pesadas (pandas, numpy)*</li>
           <li><span class="check">✓</span> Timeout massivo de 30s</li>
         </ul>
-        <a href="index.html?action=pro" class="btn btn-primary" style="width: 100%;">Assinar o Plano Pro</a>
+        <a href="/app?action=pro" class="btn btn-primary" style="width: 100%;">Assinar o Plano Pro</a>
       </div>
     </div>
   </section>
@@ -293,5 +293,20 @@
     <a href="https://www.hostinger.com/br?REFERRALCODE=RGEPETERSBXU" target="_blank" class="ad-poweredby" rel="sponsored">Patrocinado</a>
   </div>
 
+  <script>
+    // Pequeno script para verificar se o usuário está logado e ajustar a UI
+    document.addEventListener("DOMContentLoaded", () => {
+      const token = localStorage.getItem("s2api_token");
+      if (token) {
+        const dashBtn = document.getElementById("nav-dash-btn");
+        const heroBtn = document.getElementById("hero-cta-btn");
+        if (dashBtn) dashBtn.textContent = "Meu Dashboard";
+        if (heroBtn) {
+          heroBtn.textContent = "Ir para o App";
+          heroBtn.href = "/app";
+        }
+      }
+    });
+  </script>
 </body>
 </html>
