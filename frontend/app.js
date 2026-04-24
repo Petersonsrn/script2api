@@ -179,6 +179,7 @@ async function submitLogin(e) {
     hideAuthModal();
     if(state.pendingAction === "convert") runConvert();
     if(state.pendingAction === "run") runExecute();
+    if(state.pendingAction === "pro") checkoutPro();
   } catch(err) {
     errDiv.textContent = err.message;
     errDiv.classList.remove("hidden");
@@ -215,6 +216,7 @@ async function submitRegister(e) {
     hideAuthModal();
     if(state.pendingAction === "convert") runConvert();
     if(state.pendingAction === "run") runExecute();
+    if(state.pendingAction === "pro") checkoutPro();
   } catch(err) {
     errDiv.textContent = err.message;
     errDiv.classList.remove("hidden");
@@ -301,8 +303,8 @@ function closeHistory(e) {
 //   MAIN APP LOGIC
 // ============================================================
 
-document.addEventListener("DOMContentLoaded", () => {
-  initAuth();
+document.addEventListener("DOMContentLoaded", async () => {
+  await initAuth();
   
   // Handlers for stripe checkout redirects
   const params = new URLSearchParams(window.location.search);
@@ -313,6 +315,21 @@ document.addEventListener("DOMContentLoaded", () => {
   if(params.get("canceled") === "true") {
     showToast("Assinatura cancelada.", "error");
     window.history.replaceState({}, document.title, window.location.pathname);
+  }
+
+  // Handlers for landing page actions
+  if(params.get("action") === "register") {
+    if (!AuthManager.isLoggedIn()) {
+      showAuthModal("register");
+    }
+  }
+  if(params.get("action") === "pro") {
+    if (!AuthManager.isLoggedIn()) {
+      showToast("Crie sua conta ou faça login para assinar o plano Pro", "info");
+      showAuthModal("register", "pro");
+    } else {
+      checkoutPro();
+    }
   }
 });
 
