@@ -81,7 +81,16 @@ cp .env.example .env
 # Edit .env if needed (defaults work fine for local dev)
 ```
 
-### 3. Start with Docker Compose (recommended)
+### 3. Start with helper script (recommended)
+```bash
+# Aguarda PostgreSQL, roda migrations e sobe o servidor
+python scripts/start.py
+
+# Modo produção (sem reload)
+python scripts/start.py --production
+```
+
+### 3-alt. Start with Docker Compose
 ```bash
 docker-compose up -d
 # Cria as tabelas via Alembic
