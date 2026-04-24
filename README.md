@@ -47,14 +47,20 @@ script2api/
 ├── main.py                   ← App entrypoint + factory
 ├── requirements.txt
 ├── .env.example
+├── docker-compose.yml        ← Local dev stack (app + PostgreSQL)
 └── app/
     ├── core/
     │   └── config.py         ← Settings loaded from .env
     ├── routers/
+    │   ├── auth.py           ← POST /auth/register, /auth/login
+    │   ├── billing.py        ← Stripe checkout, portal & webhooks
     │   ├── convert.py        ← POST /convert  (JSON + file upload)
     │   └── health.py         ← GET  /health
     └── services/
-        └── converter.py      ← AST parser + code generator
+        ├── auth.py           ← JWT + bcrypt helpers
+        ├── converter.py      ← AST parser + code generator
+        ├── sandbox.py        ← Restricted code execution
+        └── usage.py          ← Rate-limit logic (shared)
 ```
 
 ---
@@ -75,12 +81,32 @@ cp .env.example .env
 # Edit .env if needed (defaults work fine for local dev)
 ```
 
-### 3. Start the server
+### 3. Start with Docker Compose (recommended)
 ```bash
+docker-compose up -d
+# Cria as tabelas via Alembic
+alembic upgrade head
+```
+
+### 3-alt. Start manually (needs local PostgreSQL)
+```bash
+# Crie as tabelas (ou rode alembic upgrade head)
 uvicorn main:app --reload --port 8000
 ```
 
-### 4. Open the docs
+### 4. Migrations (Alembic)
+```bash
+# Criar nova migration
+alembic revision -m "descrição"
+
+# Aplicar migrations
+alembic upgrade head
+
+# Reverter uma migration
+alembic downgrade -1
+```
+
+### 5. Open the docs
 Visit → **http://localhost:8000/docs**
 
 ---
@@ -93,7 +119,16 @@ Visit → **http://localhost:8000/docs**
 | `GET` | `/health` | Health check |
 | `POST` | `/convert` | Convert Python source (JSON body) |
 | `POST` | `/convert/upload` | Upload a `.py` file directly |
-| `GET` | `/convert/usage/{user_id}` | Check usage quota |
+| `GET` | `/convert/usage` | Check usage quota (authenticated) |
+| `POST` | `/convert/run` | Execute a function inline |
+| `POST` | `/convert/upload-and-run` | Upload `.py` and run a function |
+| `POST` | `/auth/register` | Create account |
+| `POST` | `/auth/login` | Login (returns JWT) |
+| `GET` | `/auth/me` | Current user + usage |
+| `GET` | `/auth/history` | Upload/conversion history |
+| `POST` | `/billing/create-checkout-session` | Start Pro subscription |
+| `POST` | `/billing/create-portal-session` | Manage subscription |
+| `POST` | `/billing/webhook` | Stripe events (idempotent) |
 
 ### Example request
 ```bash
@@ -101,8 +136,7 @@ curl -X POST http://localhost:8000/convert \
   -H "Content-Type: application/json" \
   -d '{
     "source": "def double(n):\n    return n * 2",
-    "script_name": "math_utils",
-    "user_id": "user_123"
+    "script_name": "math_utils"
   }'
 ```
 
@@ -123,9 +157,9 @@ curl -X POST http://localhost:8000/convert \
 - [x] Auto Pydantic model generation
 - [x] File upload support
 - [x] Free / Pro usage tracking
-- [ ] Persistent storage (SQLite → PostgreSQL)
+- [x] Persistent storage (PostgreSQL)
+- [x] Stripe payment integration
 - [ ] GitHub OAuth login
-- [ ] Stripe payment integration
 - [ ] Generated API deployment (run on cloud, not just generate code)
 - [ ] GitHub Action for CI/CD integration
 

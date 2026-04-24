@@ -8,20 +8,18 @@ GET  /auth/history   — historico de uploads
 POST /auth/upgrade   — muda plano (demo)
 """
 
-from datetime import datetime, timezone
-
 from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel, EmailStr, field_validator
 
-from app.core.config import settings
 from app.db import (
     create_user, get_user_by_email, get_user_by_id,
-    count_uploads_this_month, get_user_history, set_user_plan,
+    get_user_history, set_user_plan,
 )
 from app.services.auth import (
     hash_password, verify_password,
     create_access_token, get_current_user,
 )
+from app.services.usage import build_usage
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -66,33 +64,6 @@ class TokenResponse(BaseModel):
 
 class UpgradeRequest(BaseModel):
     plan: str  # "free" | "pro"
-
-
-# ─────────────────────────────────────────────
-#  HELPER — uso mensal
-# ─────────────────────────────────────────────
-
-def _monthly_limit(plan: str) -> int:
-    return settings.free_tier_monthly_limit if plan == "free" else 999_999
-
-
-def _resets_on() -> str:
-    now = datetime.now(timezone.utc)
-    if now.month == 12:
-        return f"{now.year + 1}-01-01"
-    return f"{now.year}-{now.month + 1:02d}-01"
-
-
-async def _build_usage(user_id: str, plan: str) -> dict:
-    used = await count_uploads_this_month(user_id)
-    limit = _monthly_limit(plan)
-    return {
-        "used": used,
-        "limit": limit if plan == "free" else None,
-        "remaining": max(0, limit - used) if plan == "free" else None,
-        "plan": plan,
-        "resets_on": _resets_on(),
-    }
 
 
 # ─────────────────────────────────────────────
@@ -156,7 +127,7 @@ async def me(current: dict = Depends(get_current_user)):
     if not user:
         raise HTTPException(status_code=404, detail="Usuario nao encontrado.")
 
-    usage = await _build_usage(user.id, user.plan)
+    usage = await build_usage(user.id, user.plan)
     return {
         "id": user.id,
         "email": user.email,

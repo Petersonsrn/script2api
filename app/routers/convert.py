@@ -4,21 +4,19 @@ app/routers/convert.py — Endpoints de conversao e execucao de scripts.
 Rate-limit mensal por usuario + historico persistente via SQLite.
 """
 
-from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
-from app.db import count_uploads_this_month, log_upload
+from app.db import log_upload
 from app.services.converter import convert
 from app.services.sandbox import execute_function
 from app.services.auth import get_current_user_optional
+from app.services.usage import check_rate_limit, build_usage
 
 router = APIRouter(prefix="/convert", tags=["convert"])
-
-FREE_LIMIT = settings.free_tier_monthly_limit
 
 
 # ─────────────────────────────────────────────
@@ -58,51 +56,6 @@ class RunResponse(BaseModel):
 #  HELPERS
 # ─────────────────────────────────────────────
 
-def _monthly_limit(plan: str) -> int:
-    return FREE_LIMIT if plan == "free" else 999_999
-
-def _resets_on() -> str:
-    now = datetime.now(timezone.utc)
-    if now.month == 12:
-        return f"{now.year + 1}-01-01"
-    return f"{now.year}-{now.month + 1:02d}-01"
-
-async def _check_rate_limit(user: dict) -> dict:
-    """
-    Verifica o limite mensal do usuario.
-    - Usuarios anonimos compartilham um bucket unico.
-    - Pro plan: sem limite.
-    Retorna o dict de usage para incluir na response.
-    """
-    user_id = user.get("sub") or user.get("id", "anonymous")
-    plan = user.get("plan", "free")
-    limit = _monthly_limit(plan)
-
-    used = await count_uploads_this_month(user_id)
-    remaining = max(0, limit - used)
-    resets_on = _resets_on()
-
-    if plan == "free" and used >= limit:
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "message": f"Limite mensal atingido ({used}/{limit}). Faca upgrade para Pro!",
-                "plan": plan,
-                "used": used,
-                "limit": limit,
-                "resets_on": resets_on,
-            },
-        )
-
-    return {
-        "user_id": user_id,
-        "plan": plan,
-        "used": used,
-        "limit": limit if plan == "free" else None,
-        "remaining": remaining if plan == "free" else None,
-        "resets_on": resets_on,
-    }
-
 def _guard_source_size(source: str) -> None:
     max_bytes = settings.sandbox_max_source_kb * 1024
     if len(source.encode("utf-8")) > max_bytes:
@@ -125,7 +78,7 @@ async def convert_script(
     current_user: dict = Depends(get_current_user_optional),
 ):
     """Converte codigo Python enviado como JSON."""
-    usage_info = await _check_rate_limit(current_user)
+    usage_info = await check_rate_limit(current_user)
     result = convert(req.source, script_name=req.script_name)
 
     status_val = "success" if result.get("success") else "error"
@@ -161,7 +114,7 @@ async def convert_upload(
 
     source = (await file.read()).decode("utf-8", errors="replace")
     _guard_source_size(source)
-    usage_info = await _check_rate_limit(current_user)
+    usage_info = await check_rate_limit(current_user)
 
     script_name = file.filename.replace(".py", "").replace(" ", "_").lower()
     result = convert(source, script_name=script_name)
@@ -194,7 +147,7 @@ async def run_function(
 ):
     """Executa uma funcao especifica de um script Python em sandbox seguro."""
     _guard_source_size(req.source)
-    usage_info = await _check_rate_limit(current_user)
+    usage_info = await check_rate_limit(current_user)
     timeout = _clamp_timeout(req.timeout)
 
     outcome = execute_function(
@@ -259,7 +212,7 @@ async def upload_and_run(
     except (ValueError, _json.JSONDecodeError) as e:
         raise HTTPException(status_code=422, detail=f"args invalido: {e}")
 
-    usage_info = await _check_rate_limit(current_user)
+    usage_info = await check_rate_limit(current_user)
     timeout = _clamp_timeout(timeout)
 
     outcome = execute_function(source=source, func_name=func_name, kwargs=kwargs, timeout=timeout)
@@ -300,13 +253,5 @@ async def get_usage(current_user: dict = Depends(get_current_user_optional)):
     """Retorna o uso mensal do usuario autenticado (ou anonimo)."""
     user_id = current_user.get("sub") or current_user.get("id", "anonymous")
     plan = current_user.get("plan", "free")
-    limit = _monthly_limit(plan)
-    used = await count_uploads_this_month(user_id)
-    return {
-        "user_id": user_id,
-        "plan": plan,
-        "used": used,
-        "limit": limit if plan == "free" else None,
-        "remaining": max(0, limit - used) if plan == "free" else None,
-        "resets_on": _resets_on(),
-    }
+    usage = await build_usage(user_id, plan)
+    return {"user_id": user_id, **usage}
