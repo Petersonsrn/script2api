@@ -16,7 +16,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.core.version import __version__
@@ -68,7 +69,10 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # ── Routers ───────────────────────────────────────────────────────────────
+    # ── Static files (frontend) ─────────────────────────────────────────────
+    app.mount("/static", StaticFiles(directory="frontend"), name="static")
+
+    # ── Routers ─────────────────────────────────────────────────────────────
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(convert.router)
@@ -104,9 +108,22 @@ def create_app() -> FastAPI:
 app = create_app()
 
 
-# ── Root ──────────────────────────────────────────────────────────────────────
-@app.get("/", tags=["meta"], summary="Informações do serviço")
+# ── Root → Landing Page ──────────────────────────────────────────────────────
+@app.get("/", tags=["meta"], include_in_schema=False)
 async def root():
+    """Redireciona para a landing page (SPA)."""
+    return RedirectResponse(url="/static/landing.html")
+
+
+@app.get("/app", tags=["meta"], include_in_schema=False)
+async def app_page():
+    """Redireciona para o app principal (dashboard)."""
+    return RedirectResponse(url="/static/index.html")
+
+
+@app.get("/api", tags=["meta"], summary="Informações do serviço")
+async def api_info():
+    """Retorna metadados da API (JSON)."""
     return {
         "service": "Script2API",
         "version": __version__,

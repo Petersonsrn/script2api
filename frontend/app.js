@@ -16,8 +16,14 @@ const API_BASE = (() => {
   const override = localStorage.getItem("s2api_base");
   if (override) return override.replace(/\/$/, "");
   // 2. Meta tag no HTML (configurado por ambiente no build)
+  //    - content=""  → mesma origem (quando servido pelo backend)
+  //    - content="https://..." → URL explícita
   const meta = document.querySelector('meta[name="api-url"]');
-  if (meta?.content) return meta.content.replace(/\/$/, "");
+  if (meta && meta.content != null) {
+    const url = meta.content.trim();
+    if (url) return url.replace(/\/$/, "");
+    return ""; // mesma origem
+  }
   // 3. Fallback produção
   return "https://script2api.onrender.com";
 })();
