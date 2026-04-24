@@ -63,7 +63,7 @@ def script_to_api(source: str, title: str = "Script2API") -> FastAPI:
 
     app = FastAPI(
         title=title,
-        description=f"API gerada automaticamente para: {', '.join(func_names)}",
+        description=f"API gerada automaticamente para: {', '.join(func_names)}.\n\n🚀 **API gerada em segundos com [Script2API](https://script2api.onrender.com)**",
         version="1.0.0",
     )
 
