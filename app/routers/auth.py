@@ -248,3 +248,115 @@ async def claim_referral(code: str, current: dict = Depends(get_current_user)):
     # Nota: O processamento real ocorre no registro
     # Este endpoint é para casos onde o referral foi perdido no signup
     return {"message": "Para usar um código de indicação, registre-se com o parâmetro referrer_code."}
+
+# ─────────────────────────────────────────────
+#  GITHUB OAUTH
+# ─────────────────────────────────────────────
+
+@router.get("/github/login", summary="Redireciona para o login do GitHub")
+async def github_login():
+    """Redireciona o usuário para a página de autorização do GitHub."""
+    if not settings.github_client_id:
+        raise HTTPException(status_code=500, detail="GitHub OAuth não configurado no servidor.")
+    
+    # URL de autorização do GitHub
+    github_auth_url = (
+        f"https://github.com/login/oauth/authorize"
+        f"?client_id={settings.github_client_id}"
+        f"&scope=user:email"
+    )
+    return {"url": github_auth_url}
+
+
+@router.post("/github/callback", summary="Callback do GitHub OAuth", response_model=TokenResponse)
+async def github_callback(code: str):
+    """
+    Recebe o código do GitHub, troca por um access_token,
+    busca o e-mail/perfil do usuário e cria/autentica a conta.
+    """
+    if not settings.github_client_id or not settings.github_client_secret:
+        raise HTTPException(status_code=500, detail="GitHub OAuth não configurado.")
+
+    import httpx
+    
+    async with httpx.AsyncClient() as client:
+        # 1. Trocar code por token
+        token_response = await client.post(
+            "https://github.com/login/oauth/access_token",
+            data={
+                "client_id": settings.github_client_id,
+                "client_secret": settings.github_client_secret,
+                "code": code,
+            },
+            headers={"Accept": "application/json"}
+        )
+        token_data = token_response.json()
+        
+        if "error" in token_data:
+            raise HTTPException(status_code=400, detail=f"Erro do GitHub: {token_data.get('error_description', 'Desconhecido')}")
+        
+        access_token = token_data.get("access_token")
+        if not access_token:
+            raise HTTPException(status_code=400, detail="Token de acesso não retornado pelo GitHub.")
+
+        # 2. Buscar perfil do usuário
+        user_response = await client.get(
+            "https://api.github.com/user",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Accept": "application/vnd.github.v3+json",
+            }
+        )
+        if user_response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Erro ao buscar dados do GitHub.")
+            
+        github_user = user_response.json()
+        
+        # 3. Buscar e-mail do usuário (pode não vir no endpoint principal se for privado)
+        email = github_user.get("email")
+        if not email:
+            emails_response = await client.get(
+                "https://api.github.com/user/emails",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Accept": "application/vnd.github.v3+json",
+                }
+            )
+            if emails_response.status_code == 200:
+                emails = emails_response.json()
+                primary_email = next((e["email"] for e in emails if e.get("primary")), None)
+                email = primary_email or (emails[0]["email"] if emails else None)
+                
+        if not email:
+            raise HTTPException(status_code=400, detail="Não foi possível obter o e-mail do GitHub.")
+
+        # 4. Criar ou buscar usuário local
+        user = await get_user_by_email(email)
+        if not user:
+            # Criar nova conta
+            # Cria um username baseado no github_login ou e-mail
+            username = github_user.get("login") or email.split("@")[0]
+            # Adiciona sufixo caso já exista (simples)
+            import secrets
+            # Senha dummy já que fará login pelo github
+            dummy_password = hash_password(secrets.token_hex(16))
+            try:
+                user = await create_user(email, username, dummy_password, None)
+            except Exception:
+                # Username conflitante, tentar outro
+                username = f"{username}_{secrets.token_hex(2)}"
+                user = await create_user(email, username, dummy_password, None)
+
+        # 5. Gerar JWT do app
+        app_token = create_access_token(user.id, user.email, user.username, user.plan)
+        
+        return TokenResponse(
+            access_token=app_token,
+            user={
+                "id": user.id, 
+                "email": user.email, 
+                "username": user.username, 
+                "plan": user.plan,
+                "credits": user.credits,
+            },
+        )

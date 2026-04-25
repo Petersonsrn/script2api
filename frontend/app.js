@@ -225,6 +225,20 @@ async function submitRegister(e) {
   }
 }
 
+async function loginWithGitHub() {
+  try {
+    const res = await fetch(`${API_BASE}/auth/github/login`);
+    const data = await res.json();
+    if(data.url) {
+      window.location.href = data.url;
+    } else {
+      showToast(data.detail || "Erro ao conectar com GitHub", "error");
+    }
+  } catch(err) {
+    showToast("GitHub OAuth não configurado", "error");
+  }
+}
+
 function selectUserMenu() {} // dummy
 function toggleUserMenu() {
   document.getElementById("user-menu").classList.toggle("hidden");
@@ -304,10 +318,30 @@ function closeHistory(e) {
 // ============================================================
 
 document.addEventListener("DOMContentLoaded", async () => {
+  const params = new URLSearchParams(window.location.search);
+  
+  // GitHub OAuth Callback
+  const ghCode = params.get("code");
+  if (ghCode) {
+    showLoading("Autenticando via GitHub...");
+    try {
+      const res = await fetch(`${API_BASE}/auth/github/callback?code=${ghCode}`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Erro no login via GitHub");
+      AuthManager.setToken(data.access_token);
+      showToast("Login com GitHub realizado com sucesso!", "success");
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch(err) {
+      showToast(err.message, "error");
+    } finally {
+      hideLoading();
+    }
+  }
+
   await initAuth();
   
   // Handlers for stripe checkout redirects
-  const params = new URLSearchParams(window.location.search);
   if(params.get("success") === "true") {
     showToast("Assinatura confirmada com sucesso! Bem-vindo ao Pro.", "success");
     window.history.replaceState({}, document.title, window.location.pathname);

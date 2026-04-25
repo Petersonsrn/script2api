@@ -210,6 +210,15 @@ body {
   font-size: 0.82rem;
   color: var(--text-muted);
   margin-bottom: 20px;
+  transition: all var(--transition);
+  cursor: default;
+}
+.hero-tag:hover {
+  background: rgba(124,92,252,0.15);
+  border-color: var(--accent);
+  color: var(--text);
+  box-shadow: 0 0 16px rgba(124,92,252,0.4);
+  transform: translateY(-2px);
 }
 
 .hero-title {
@@ -221,10 +230,18 @@ body {
 }
 
 .gradient-text {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  background: linear-gradient(135deg, var(--accent), var(--accent-2), #ff007a, var(--accent));
+  background-size: 300% 300%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  animation: textGradient 6s ease infinite;
+}
+
+@keyframes textGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 .hero-sub {
@@ -569,6 +586,25 @@ body {
   background: rgba(244,63,94,0.1); border: 1px solid rgba(244,63,94,0.3); border-radius: var(--radius-sm);
   color: #fca5a5; padding: 10px 12px; font-size: 0.85rem; margin-bottom: 16px; text-align: center;
 }
+
+.auth-divider {
+  display: flex; align-items: center; text-align: center; margin: 16px 0; color: var(--text-faint); font-size: 0.85rem;
+}
+.auth-divider::before, .auth-divider::after {
+  content: ''; flex: 1; border-bottom: 1px solid var(--border);
+}
+.auth-divider span { padding: 0 10px; }
+
+.btn-github {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+  padding: 12px 28px; background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text); font-family: var(--font);
+  font-size: 0.95rem; font-weight: 500; cursor: pointer; transition: all var(--transition);
+}
+.btn-github:hover {
+  background: rgba(255,255,255,0.1); border-color: var(--border-high);
+}
+.github-icon { width: 18px; height: 18px; }
 
 /* ── HISTORY PANEL ────────────────────────────────────────── */
 .history-overlay {

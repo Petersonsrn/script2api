@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     addon_timeout_extra_price_id: str = "price_timeout_..."  # $5 = 30s extra
     addon_priority_price_id: str = "price_priority_..."  # $10/mês = fila prioritária
 
+    # ── GitHub OAuth ──────────────────────────────────
+    github_client_id: str = ""
+    github_client_secret: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
