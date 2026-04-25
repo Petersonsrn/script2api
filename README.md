@@ -136,9 +136,12 @@ Visit → **http://localhost:8000/docs**
 | `GET` | `/auth/me` | Current user + usage |
 | `GET` | `/auth/history` | Upload/conversion history (paginated) |
 | `DELETE` | `/auth/me` | Delete account and all data (LGPD/GDPR) |
-| `POST` | `/billing/create-checkout-session` | Start Pro subscription |
+| `POST` | `/billing/create-checkout-session` | Start subscription (starter/pro/enterprise) |
+| `POST` | `/billing/buy-credits` | Buy pay-as-you-go credits |
 | `POST` | `/billing/create-portal-session` | Manage subscription |
 | `POST` | `/billing/webhook` | Stripe events (idempotent) |
+| `GET` | `/auth/referrals` | Referral program stats |
+| `POST` | `/auth/claim-referral` | Claim referral bonus |
 
 ### Example request
 ```bash
@@ -154,10 +157,21 @@ curl -X POST http://localhost:8000/convert \
 
 ## 💰 Monetization Model
 
-| Tier | Conversions/month | File Upload | API Access | Price |
-|------|:-----------------:|:-----------:|:----------:|-------|
-| Free | 10 | ✅ | ❌ | $0 |
-| Pro | Unlimited | ✅ | ✅ | $9/mo |
+| Tier | Conversions/month | Features | Price |
+|------|:-----------------:|----------|-------|
+| **Free** | 5 | Basic sandbox (5s), Community support | $0 |
+| **Starter** | 25 | Extended sandbox (10s), Email support, Basic analytics | $9/mo |
+| **Pro** | 100 | Priority queue, Advanced analytics, Webhooks (30s) | $29/mo |
+| **Enterprise** | Unlimited | SLA, Dedicated support, Custom domain, API keys | $99/mo |
+
+### Pay-as-you-go Credits
+- $5 = 50 extra conversions (works with any tier)
+- Never expires, use when you exceed monthly limit
+
+### Referral Program
+- Invite friends: **+5 credits** per signup
+- New users get: **+3 credits** bonus
+- Share your referral link from `/auth/referrals`
 
 ---
 
