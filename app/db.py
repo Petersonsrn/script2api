@@ -40,6 +40,8 @@ class User:
     plan: str = "free"
     created_at: str = ""
     stripe_customer_id: str | None = None
+    credits: int = 0  # créditos pay-as-you-go
+    referrer_id: str | None = None  # quem indicou este usuário
 
 
 @dataclass
@@ -112,7 +114,9 @@ CREATE TABLE IF NOT EXISTS users (
     password            TEXT NOT NULL,
     plan                TEXT NOT NULL DEFAULT 'free',
     created_at          TEXT NOT NULL,
-    stripe_customer_id  TEXT
+    stripe_customer_id  TEXT,
+    credits             INTEGER DEFAULT 0,
+    referrer_id         TEXT REFERENCES users(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
 CREATE INDEX IF NOT EXISTS idx_users_stripe ON users (stripe_customer_id);
@@ -177,6 +181,8 @@ async def init_db() -> None:
 # ─────────────────────────────────────────────
 
 def _row_to_user(row: asyncpg.Record) -> User:
+    if not row:
+        return None
     return User(
         id=row["id"],
         email=row["email"],
@@ -185,28 +191,40 @@ def _row_to_user(row: asyncpg.Record) -> User:
         plan=row["plan"],
         created_at=row["created_at"],
         stripe_customer_id=row.get("stripe_customer_id"),
+        credits=row.get("credits", 0) or 0,
+        referrer_id=row.get("referrer_id"),
     )
 
 
-async def create_user(email: str, username: str, hashed_password: str) -> User:
+async def create_user(email: str, username: str, hashed_password: str, referrer_id: str | None = None) -> User:
     user_id = str(uuid.uuid4())
     now = _now()
     pool = get_pool()
+    
+    # Calcular créditos iniciais (bônus de signup se veio por referral)
+    initial_credits = 0
+    if referrer_id and settings.referral_enabled:
+        initial_credits = settings.referral_signup_credits
+    
     async with pool.acquire() as conn:
         await conn.execute(
-            "INSERT INTO users (id, email, username, password, plan, created_at) "
-            "VALUES ($1,$2,$3,$4,$5,$6)",
-            user_id, email.lower(), username, hashed_password, "free", now,
+            "INSERT INTO users (id, email, username, password, plan, created_at, credits, referrer_id) "
+            "VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
+            user_id, email.lower(), username, hashed_password, "free", now, initial_credits, referrer_id,
         )
-    return User(id=user_id, email=email.lower(), username=username,
-                password=hashed_password, plan="free", created_at=now)
+    
+    return User(
+        id=user_id, email=email.lower(), username=username,
+        password=hashed_password, plan="free", created_at=now,
+        credits=initial_credits, referrer_id=referrer_id
+    )
 
 
 async def get_user_by_email(email: str) -> User | None:
     pool = get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT id, email, username, password, plan, created_at, stripe_customer_id "
+            "SELECT id, email, username, password, plan, created_at, stripe_customer_id, credits, referrer_id "
             "FROM users WHERE email = $1",
             email.lower(),
         )
@@ -217,7 +235,7 @@ async def get_user_by_id(user_id: str) -> User | None:
     pool = get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT id, email, username, password, plan, created_at, stripe_customer_id "
+            "SELECT id, email, username, password, plan, created_at, stripe_customer_id, credits, referrer_id "
             "FROM users WHERE id = $1",
             user_id,
         )
@@ -228,7 +246,7 @@ async def get_user_by_stripe_id(customer_id: str) -> User | None:
     pool = get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT id, email, username, password, plan, created_at, stripe_customer_id "
+            "SELECT id, email, username, password, plan, created_at, stripe_customer_id, credits, referrer_id "
             "FROM users WHERE stripe_customer_id = $1",
             customer_id,
         )
@@ -240,6 +258,42 @@ async def delete_user(user_id: str) -> None:
     pool = get_pool()
     async with pool.acquire() as conn:
         await conn.execute("DELETE FROM users WHERE id = $1", user_id)
+
+
+async def update_user_credits(user_id: str, delta: int) -> int:
+    """Adiciona (delta > 0) ou remove (delta < 0) créditos. Retorna novo total."""
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE users SET credits = credits + $1 WHERE id = $2",
+            delta, user_id
+        )
+        row = await conn.fetchrow("SELECT credits FROM users WHERE id = $1", user_id)
+        return row["credits"] if row else 0
+
+
+async def get_user_referrals_count(user_id: str) -> int:
+    """Retorna quantos usuários este usuário indicou."""
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT COUNT(*) FROM users WHERE referrer_id = $1",
+            user_id
+        )
+        return row[0] if row else 0
+
+
+async def get_user_by_referral_code(code: str) -> User | None:
+    """Busca usuário cujo ID começa com o código de referral."""
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        # Busca usuários cujo ID começa com o código (case insensitive)
+        row = await conn.fetchrow(
+            "SELECT id, email, username, password, plan, created_at, stripe_customer_id, credits, referrer_id "
+            "FROM users WHERE LOWER(id) LIKE LOWER($1 || '%')",
+            code,
+        )
+    return _row_to_user(row) if row else None
 
 
 async def set_user_plan(user_id: str, plan: str) -> None:

@@ -11,12 +11,13 @@ import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 
 import app.db as db_module
+from app.core.config import settings
 
 _fake_users: dict[str, dict] = {}
 _fake_uploads: list[dict] = []
 
 
-def _fake_user_obj(user_id, email, username, password, plan="free"):
+def _fake_user_obj(user_id, email, username, password, plan="free", credits=0, referrer_id=None):
     from app.db import User
     return User(
         id=user_id,
@@ -25,6 +26,8 @@ def _fake_user_obj(user_id, email, username, password, plan="free"):
         password=password,
         plan=plan,
         created_at="2024-01-01T00:00:00+00:00",
+        credits=credits,
+        referrer_id=referrer_id,
     )
 
 
@@ -34,8 +37,10 @@ def patch_db(monkeypatch):
     _fake_users.clear()
     _fake_uploads.clear()
 
-    async def _create_user(email, username, hashed_password):
-        user = _fake_user_obj("uid-001", email, username, hashed_password)
+    async def _create_user(email, username, hashed_password, referrer_id=None):
+        user = _fake_user_obj("uid-001", email, username, hashed_password, credits=0, referrer_id=referrer_id)
+        if referrer_id and settings.referral_enabled:
+            user.credits = settings.referral_signup_credits
         _fake_users[email] = user
         return user
 
@@ -96,6 +101,26 @@ def patch_db(monkeypatch):
                 removed = True
         return removed
 
+    async def _update_user_credits(user_id, delta):
+        for u in _fake_users.values():
+            if u.id == user_id:
+                u.credits = (u.credits or 0) + delta
+                return u.credits
+        return 0
+
+    async def _get_user_referrals_count(user_id):
+        count = 0
+        for u in _fake_users.values():
+            if getattr(u, 'referrer_id', None) == user_id:
+                count += 1
+        return count
+
+    async def _get_user_by_referral_code(code):
+        for u in _fake_users.values():
+            if u.id.lower().startswith(code.lower()):
+                return u
+        return None
+
     async def _is_event_processed(event_id):
         return False
 
@@ -128,6 +153,9 @@ def patch_db(monkeypatch):
     monkeypatch.setattr(db_module, "save_webhook_event", _save_webhook_event)
     monkeypatch.setattr(db_module, "mark_event_processed", _mark_event_processed)
     monkeypatch.setattr(db_module, "delete_user", _delete_user)
+    monkeypatch.setattr(db_module, "update_user_credits", _update_user_credits)
+    monkeypatch.setattr(db_module, "get_user_referrals_count", _get_user_referrals_count)
+    monkeypatch.setattr(db_module, "get_user_by_referral_code", _get_user_by_referral_code)
     monkeypatch.setattr(db_module, "init_pool", _init_pool)
     monkeypatch.setattr(db_module, "init_db", _init_db)
     monkeypatch.setattr(db_module, "close_pool", _close_pool)

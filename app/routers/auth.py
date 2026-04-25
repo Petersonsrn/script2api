@@ -13,8 +13,10 @@ from pydantic import BaseModel, EmailStr, field_validator
 
 from app.db import (
     create_user, get_user_by_email, get_user_by_id,
-    get_user_history, set_user_plan,
+    get_user_history, set_user_plan, get_user_referrals_count,
+    update_user_credits, get_user_by_referral_code, delete_user,
 )
+from app.core.config import settings
 from app.services.auth import (
     hash_password, verify_password,
     create_access_token, get_current_user,
@@ -32,6 +34,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     username: str
     password: str
+    referrer_code: str | None = None  # código de quem indicou
 
     @field_validator("username")
     @classmethod
@@ -82,18 +85,36 @@ async def register(req: RegisterRequest):
     if await get_user_by_email(req.email):
         raise HTTPException(status_code=409, detail="E-mail ja cadastrado.")
 
+    # Buscar referrer pelo código (primeiros 8 chars do UUID)
+    referrer_id = None
+    if req.referrer_code and settings.referral_enabled:
+        referrer = await get_user_by_referral_code(req.referrer_code)
+        if referrer:
+            referrer_id = referrer.id
+
     hashed = hash_password(req.password)
     try:
-        user = await create_user(req.email, req.username, hashed)
+        user = await create_user(req.email, req.username, hashed, referrer_id)
     except Exception as e:
         if "UNIQUE" in str(e):
             raise HTTPException(status_code=409, detail="Username ja em uso.")
         raise HTTPException(status_code=500, detail="Erro ao criar conta.")
+    
+    # Se veio de referral, adicionar bônus ao referrer
+    if user.referrer_id and settings.referral_enabled:
+        await update_user_credits(user.referrer_id, settings.referral_bonus_credits)
 
     token = create_access_token(user.id, user.email, user.username, user.plan)
     return TokenResponse(
         access_token=token,
-        user={"id": user.id, "email": user.email, "username": user.username, "plan": user.plan},
+        user={
+            "id": user.id, 
+            "email": user.email, 
+            "username": user.username, 
+            "plan": user.plan,
+            "credits": user.credits,
+            "referral_bonus": settings.referral_signup_credits if user.referrer_id else 0,
+        },
     )
 
 
@@ -191,6 +212,39 @@ async def delete_me(current: dict = Depends(get_current_user)):
     if not user:
         raise HTTPException(status_code=404, detail="Usuario nao encontrado.")
 
-    from app.db import delete_user
     await delete_user(user_id)
     return None
+
+
+@router.get("/referrals", summary="Dados do programa de indicação")
+async def get_referrals(current: dict = Depends(get_current_user)):
+    """Retorna código de referral e contagem de indicações."""
+    user_id = current["sub"]
+    user = await get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario nao encontrado.")
+    
+    count = await get_user_referrals_count(user_id)
+    
+    return {
+        "enabled": settings.referral_enabled,
+        "referral_code": user_id[:8],  # usar primeiros 8 chars do UUID como código
+        "referral_url": f"{settings.frontend_url}/?ref={user_id[:8]}",
+        "referrals_count": count,
+        "bonus_per_referral": settings.referral_bonus_credits if settings.referral_enabled else 0,
+        "credits": await get_user_credits(user_id),
+    }
+
+
+@router.post("/claim-referral", summary="Resgatar bônus de indicação")
+async def claim_referral(code: str, current: dict = Depends(get_current_user)):
+    """
+    Aplica bônus de indicação quando um novo usuário usa código de referral.
+    (Normalmente chamado automaticamente no registro)
+    """
+    if not settings.referral_enabled:
+        raise HTTPException(status_code=400, detail="Programa de indicação desabilitado.")
+    
+    # Nota: O processamento real ocorre no registro
+    # Este endpoint é para casos onde o referral foi perdido no signup
+    return {"message": "Para usar um código de indicação, registre-se com o parâmetro referrer_code."}
